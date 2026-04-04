@@ -8,8 +8,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(FetchContent)
 
 # update to contain more rust flags
-set(TOKENIZERS_CPP_RUST_FLAGS "")
-set(TOKENIZERS_CPP_CARGO_TARGET "")
+if (NOT DEFINED TOKENIZERS_CPP_RUST_FLAGS)
+  set(TOKENIZERS_CPP_RUST_FLAGS "")
+endif()
+if (NOT DEFINED TOKENIZERS_CPP_CARGO_TARGET)
+  set(TOKENIZERS_CPP_CARGO_TARGET "")
+endif()
 
 # extra link libraries
 set(TOKENIZERS_CPP_LINK_LIBS "")
@@ -73,7 +77,7 @@ if(WIN32)
   )
 endif()
 
-set(TOKENIZERS_CPP_CARGO_FLAGS "")
+set(TOKENIZERS_CPP_CARGO_FLAGS --locked)
 set(TOKENIZERS_CPP_CARGO_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(TOKENIZERS_CPP_CARGO_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -139,12 +143,13 @@ add_custom_command(
   ${TOKENIZERS_RUST_LIB} "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-set(
-  TOKENIZER_CPP_SRCS
-  src/sentencepiece_tokenizer.cc
+set(TOKENIZER_CPP_SRCS
   src/huggingface_tokenizer.cc
   src/rwkv_world_tokenizer.cc
 )
+if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
+  list(APPEND TOKENIZER_CPP_SRCS src/sentencepiece_tokenizer.cc)
+endif ()
 add_library(tokenizers_cpp STATIC ${TOKENIZER_CPP_SRCS})
 target_include_directories(tokenizers_cpp PRIVATE sentencepiece/src)
 target_include_directories(tokenizers_cpp PRIVATE msgpack/include)
@@ -166,10 +171,16 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
           XCODE_ATTRIBUTE_${XCODE_PROPERTY} ${XCODE_VALUE})
   endmacro (set_xcode_property)
 endif()
-add_subdirectory(sentencepiece sentencepiece EXCLUDE_FROM_ALL)
+if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
+  add_subdirectory(sentencepiece sentencepiece EXCLUDE_FROM_ALL)
+endif ()
 
 add_library(tokenizers_c INTERFACE ${TOKENIZERS_RUST_LIB})
 target_link_libraries(tokenizers_c INTERFACE ${TOKENIZERS_RUST_LIB} ${TOKENIZERS_C_LINK_LIBS})
 
-target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c sentencepiece-static ${TOKENIZERS_CPP_LINK_LIBS})
+if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
+  target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c sentencepiece-static ${TOKENIZERS_CPP_LINK_LIBS})
+else ()
+  target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c ${TOKENIZERS_CPP_LINK_LIBS})
+endif ()
 target_include_directories(tokenizers_cpp PUBLIC ${TOKENIZERS_CPP_INCLUDE})
