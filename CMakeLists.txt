@@ -10,8 +10,12 @@ include(FetchContent)
 set(TOKENIZERS_CPP_MSVC_RUNTIME_LIBRARY "" CACHE STRING "MSVC runtime library setting (One of MT or MD)")
 
 # update to contain more rust flags
-set(TOKENIZERS_CPP_RUST_FLAGS "")
-set(TOKENIZERS_CPP_CARGO_TARGET "")
+if(NOT DEFINED TOKENIZERS_CPP_RUST_FLAGS)
+  set(TOKENIZERS_CPP_RUST_FLAGS "")
+endif()
+if(NOT DEFINED TOKENIZERS_CPP_CARGO_TARGET)
+  set(TOKENIZERS_CPP_CARGO_TARGET "")
+endif()
 
 if(TOOLCHAIN_DIR AND NOT TOOLCHAIN_DIR MATCHES "/$")
   set(TOOLCHAIN_DIR "${TOOLCHAIN_DIR}/")
@@ -164,14 +168,17 @@ add_custom_command(
   ${TOKENIZERS_RUST_LIB} "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-set(
-  TOKENIZER_CPP_SRCS
-  src/sentencepiece_tokenizer.cc
+set(TOKENIZER_CPP_SRCS
   src/huggingface_tokenizer.cc
   src/rwkv_world_tokenizer.cc
 )
+if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
+  list(APPEND TOKENIZER_CPP_SRCS src/sentencepiece_tokenizer.cc)
+endif ()
 add_library(tokenizers_cpp STATIC ${TOKENIZER_CPP_SRCS})
-target_include_directories(tokenizers_cpp PRIVATE sentencepiece/src)
+if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
+  target_include_directories(tokenizers_cpp PRIVATE sentencepiece/src)
+endif ()
 target_include_directories(tokenizers_cpp PRIVATE msgpack/include)
 target_include_directories(tokenizers_cpp PUBLIC ${TOKENIZERS_CPP_INCLUDE})
 if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
@@ -191,10 +198,16 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
           XCODE_ATTRIBUTE_${XCODE_PROPERTY} ${XCODE_VALUE})
   endmacro (set_xcode_property)
 endif()
-add_subdirectory(sentencepiece sentencepiece EXCLUDE_FROM_ALL)
+if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
+  add_subdirectory(sentencepiece sentencepiece EXCLUDE_FROM_ALL)
+endif ()
 
 add_library(tokenizers_c INTERFACE ${TOKENIZERS_RUST_LIB})
 target_link_libraries(tokenizers_c INTERFACE ${TOKENIZERS_RUST_LIB} ${TOKENIZERS_C_LINK_LIBS})
 
-target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c sentencepiece-static ${TOKENIZERS_CPP_LINK_LIBS})
+if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
+  target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c sentencepiece-static ${TOKENIZERS_CPP_LINK_LIBS})
+else()
+  target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c ${TOKENIZERS_CPP_LINK_LIBS})
+endif()
 target_include_directories(tokenizers_cpp PUBLIC ${TOKENIZERS_CPP_INCLUDE})
